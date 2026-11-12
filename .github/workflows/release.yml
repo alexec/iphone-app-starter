@@ -33,7 +33,7 @@ jobs:
     timeout-minutes: 60
     environment: testflight
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: The App Store Connect key is there
         env:
