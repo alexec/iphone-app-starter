@@ -1,0 +1,58 @@
+# The template's own check, which a new app does not get (.starterignore): fill the
+# placeholders with sample values, as Agents does, check the workflows, and build the app for
+# the simulator.
+name: template
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  XCODEGEN: 2.46.0
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Fill the placeholders with sample values
+        run: python3 .github/template/fill.py
+
+      - name: The workflows say their deploys (Agents' Lineage reads the notice)
+        run: |
+          grep -qF '::notice title=deploy::testflight:$BUNDLE_ID/${{ github.run_number }}' .github/workflows/release.yml
+          grep -qF '::notice title=deploy::appstore:$BUNDLE_ID/${TAG#v}' .github/workflows/app-store.yml
+          grep -qF 'BUNDLE_ID: com.example.tidelog' .github/workflows/release.yml
+          for w in setup release app-store; do
+            grep -qF 'bash scripts/asc-key.sh "$RUNNER_TEMP/asc.p8"' ".github/workflows/$w.yml"
+          done
+
+      - name: The icon is a PNG (App Store Connect refuses a build with none)
+        run: file App/Assets.xcassets/AppIcon.appiconset/AppIcon.png | grep -q 'PNG image'
+
+      - name: asc-key.sh puts back a pasted key's line breaks
+        run: |
+          openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "$RUNNER_TEMP/key.p8"
+          ASC_KEY_P8="$(tr -d '\n' < "$RUNNER_TEMP/key.p8")" bash scripts/asc-key.sh "$RUNNER_TEMP/out.p8"
+          cmp "$RUNNER_TEMP/key.p8" "$RUNNER_TEMP/out.p8"
+          ASC_KEY_P8="$(tr '\n' ' ' < "$RUNNER_TEMP/key.p8")" bash scripts/asc-key.sh "$RUNNER_TEMP/out.p8"
+          cmp "$RUNNER_TEMP/key.p8" "$RUNNER_TEMP/out.p8"
+          if ASC_KEY_P8='not a key!' bash scripts/asc-key.sh "$RUNNER_TEMP/bad.p8"; then exit 1; fi
+
+      - name: XcodeGen
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/xcodegen.zip" "https://github.com/yonaskolb/XcodeGen/releases/download/$XCODEGEN/xcodegen.zip"
+          unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
+          "$RUNNER_TEMP/xcodegen/bin/xcodegen" generate
+
+      - name: Build for the simulator
+        run: |
+          set -o pipefail
+          xcodebuild build -project App.xcodeproj -scheme App \
+            -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO | tail -n 40

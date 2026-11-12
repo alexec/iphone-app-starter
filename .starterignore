@@ -1,0 +1,4 @@
+# The template's own files: Agents' make_app_repository leaves them out of a new app.
+.github/README.md
+.github/template
+.github/workflows/template.yml
