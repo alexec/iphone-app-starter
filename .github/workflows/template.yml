@@ -26,7 +26,7 @@ jobs:
 
       - name: The workflows say their deploys (Agents' Lineage reads the notice)
         run: |
-          grep -qF '::notice title=deploy::testflight:$BUNDLE_ID/${{ github.run_number }}' .github/workflows/release.yml
+          grep -qF '::notice title=deploy::testflight:$BUNDLE_ID/$''{{ github.run_number }}' .github/workflows/release.yml
           grep -qF '::notice title=deploy::appstore:$BUNDLE_ID/${TAG#v}' .github/workflows/app-store.yml
           grep -qF 'BUNDLE_ID: com.example.tidelog' .github/workflows/release.yml
           for w in setup release app-store; do
